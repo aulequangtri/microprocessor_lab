@@ -180,7 +180,6 @@
     \vfill
     \mdseries
     \begin{tabular}{rll}
-      Advisor(s): \@advisor \\
       Student(s): \@stuname \\
     \end{tabular}
     \vfill
