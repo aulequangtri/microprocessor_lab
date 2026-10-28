@@ -3,6 +3,7 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{float}
+\usepackage{array}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{tikz}
@@ -17,6 +18,7 @@
 \coverpage
 
 \tableofcontents
+
 \newpage
 
 \section{Introduction and System Architecture}
@@ -33,11 +35,12 @@ In embedded systems, interfacing digital inputs such as mechanical push-buttons 
 \subsection{System Overview}
 The system models a four-way crossroad controlled by three user push-buttons and displays status across 12 LEDs and four 7-segment displays:
 \begin{itemize}
-    \item \textbf{Traffic LEDs (12 LEDs total):} 4 Red, 4 Amber, 4 Green grouped into two arterial roads:
+    \item \textbf{Traffic LEDs (12 LEDs total):} The 4-way crossroad contains 4 Red, 4 Amber, and 4 Green LEDs. Road 1 (North--South) and Road 2 (East--West) each govern two opposing traffic heads ($2 \times 3 = 6$ LEDs per road):
     \begin{itemize}
-        \item \textbf{Road 1:} Red 1 (\texttt{PA0}), Amber 1 (\texttt{PA1}), Green 1 (\texttt{PA2}).
-        \item \textbf{Road 2:} Red 2 (\texttt{PA3}), Amber 2 (\texttt{PA4}), Green 2 (\texttt{PA5}).
+        \item \textbf{Road 1 (North--South, 6 LEDs):} Red 1 (\texttt{PA0}), Amber 1 (\texttt{PA1}), Green 1 (\texttt{PA2}). Both opposing heads operate in parallel.
+        \item \textbf{Road 2 (East--West, 6 LEDs):} Red 2 (\texttt{PA3}), Amber 2 (\texttt{PA4}), Green 2 (\texttt{PA5}). Both opposing heads operate in parallel.
     \end{itemize}
+    In Proteus simulation, each color pair is represented by one LED indicator per road to maintain a clean schematic while fully simulating the 4-way intersection logic.
     \item \textbf{Multiplexed 7-Segment Displays (4 Digits):}
     \begin{itemize}
         \item Two displays show the countdown time for Road 1 (digits 0 and 1).
@@ -74,6 +77,7 @@ The default factory calibration is configured as:
 \end{equation}
 Whenever the user modifies one parameter in Modes 2, 3, or 4, the firmware automatically recalculates the dependent parameter upon pressing Button 3 (Set) to maintain equation (\ref{eq:time_rule}) at all times.
 
+
 \newpage
 \section{Exercise 1: Finite State Machine Design}
 
@@ -83,24 +87,27 @@ Mechanical buttons suffer from transient bouncing. Furthermore, user interfaces 
 We model each button as a 3-state FSM inside \texttt{input\_processing.c}:
 \begin{itemize}
     \item \textbf{\texttt{BUTTON\_RELEASED}:} Default idle state. When a debounced pressed state is detected, emit a single click event (\texttt{event = 1}) and transition to \texttt{BUTTON\_PRESSED}.
-    \item \textbf{\texttt{BUTTON\_PRESSED}:} Button is currently held down. If released, return to \texttt{BUTTON\_RELEASED}. If held continuously for at least $1000\,\text{ms}$ (signaled by \texttt{is\_button\_pressed\_1s()}), transition to \texttt{BUTTON\_PRESSED\_MORE\_THAN\_1\_SECOND} and initialize the auto-repeat software timer to $500\,\text{ms}$.
-    \item \textbf{\texttt{BUTTON\_PRESSED\_MORE\_THAN\_1\_SECOND}:} While held, whenever the $500\,\text{ms}$ timer expires, emit a repeat event (\texttt{event = 1}) and reset the timer to $500\,\text{ms}$. If released, return to \texttt{BUTTON\_RELEASED}.
+    \item \textbf{\texttt{BUTTON\_PRESSED}:} Button is held down. If released, return to \texttt{BUTTON\_RELEASED}. If held for $\ge 1\,\text{s}$ (\texttt{is\_button\_pressed\_1s()}), advance to the auto-repeat state with a $500\,\text{ms}$ timer.
+    \item \textbf{\texttt{BUTTON\_PRESSED\_}\allowbreak\texttt{MORE\_}\allowbreak\texttt{THAN\_}\allowbreak\texttt{1\_SECOND}:} While held, whenever the $500\,\text{ms}$ timer expires, emit a repeat event (\texttt{event = 1}) and reset the timer to $500\,\text{ms}$. If released, return to \texttt{BUTTON\_RELEASED}.
 \end{itemize}
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=4cm,semithick]
+\begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=4.5cm,semithick,scale=0.92,every node/.style={transform shape}]
   \tikzstyle{every state}=[fill=blue!10,draw=blue!60,thick,text=black,align=center]
 
-  \node[initial,state] (A) {\textbf{BUTTON}\\\textbf{RELEASED}};
-  \node[state]         (B) [right of=A, node distance=5.5cm] {\textbf{BUTTON}\\\textbf{PRESSED}};
-  \node[state]         (C) [below of=B, node distance=4.5cm] {\textbf{PRESSED}\\\textbf{$> 1\,\text{s}$}};
+  
+\node[initial,state] (A) {\textbf{BUTTON}\\\textbf{RELEASED}};
+  
+\node[state]         (B) [right of=A, node distance=5.0cm] {\textbf{BUTTON}\\\textbf{PRESSED}};
+  
+\node[state]         (C) [below of=B, node distance=4.2cm] {\textbf{PRESSED}\\\textbf{$> 1\,\text{s}$}};
 
-  \path (A) edge [bend left=20]  node [above] {Press detected / \texttt{event=1}} (B)
-        (B) edge [bend left=20]  node [below] {Release detected} (A)
-        (B) edge [right]         node [right] {Held $\ge 1\,\text{s}$ / set timer $500\,\text{ms}$} (C)
-        (C) edge [bend left=35]  node [left]  {Release detected} (A)
-        (C) edge [loop right]    node [right,align=left] {Timer expired \& repeat enabled\\/ \texttt{event=1}, set timer $500\,\text{ms}$} (C);
+  \path (A) edge [bend left=20]  node [above] {Press / \texttt{event=1}} (B)
+        (B) edge [bend left=20]  node [below] {Release} (A)
+        (B) edge [right]         node [right] {Held $\ge 1\,\text{s}$ / Timer $500\,\text{ms}$} (C)
+        (C) edge [bend left=30]  node [left]  {Release detected} (A)
+        (C) edge [loop below]    node [below,align=center] {Timer expired \& repeat enabled\\/ \texttt{event=1}, reset timer $500\,\text{ms}$} (C);
 \end{tikzpicture}
 \caption{Finite State Machine for Button Event Processing with Auto-Repeat}
 \label{fig:button_fsm}
@@ -114,10 +121,14 @@ The top-level operational state of the traffic controller is governed by a cycli
 \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=4.2cm,semithick]
   \tikzstyle{every state}=[fill=green!10,draw=green!60!black,thick,align=center]
 
-  \node[initial,state] (M1) {\textbf{MODE 1}\\\small Normal Cycle\\\small (Dual Countdown)};
-  \node[state]         (M2) [right of=M1, node distance=5cm] {\textbf{MODE 2}\\\small Edit Red\\\small (Red Blinks 2Hz)};
-  \node[state]         (M3) [below of=M2, node distance=4cm] {\textbf{MODE 3}\\\small Edit Amber\\\small (Amber Blinks 2Hz)};
-  \node[state]         (M4) [below of=M1, node distance=4cm] {\textbf{MODE 4}\\\small Edit Green\\\small (Green Blinks 2Hz)};
+  
+\node[initial,state] (M1) {\textbf{MODE 1}\\\small Normal Cycle\\\small (Dual Countdown)};
+  
+\node[state]         (M2) [right of=M1, node distance=5cm] {\textbf{MODE 2}\\\small Edit Red\\\small (Red Blinks 2Hz)};
+  
+\node[state]         (M3) [below of=M2, node distance=4cm] {\textbf{MODE 3}\\\small Edit Amber\\\small (Amber Blinks 2Hz)};
+  
+\node[state]         (M4) [below of=M1, node distance=4cm] {\textbf{MODE 4}\\\small Edit Green\\\small (Green Blinks 2Hz)};
 
   \path (M1) edge [above] node {Button 1 click} (M2)
         (M2) edge [right] node {Button 1 click} (M3)
@@ -136,10 +147,14 @@ In Mode 1, the traffic intersection executes four consecutive phases continuousl
 \begin{tikzpicture}[->,>=stealth',shorten >=1pt,auto,node distance=4.5cm,semithick]
   \tikzstyle{every state}=[fill=yellow!15,draw=orange!80,thick,align=center]
 
-  \node[initial,state] (P0) {\textbf{Phase 0}\\\small Road 1: GREEN ($t_g$)\\\small Road 2: RED ($t_g$)};
-  \node[state]         (P1) [right of=P0, node distance=5.5cm] {\textbf{Phase 1}\\\small Road 1: AMBER ($t_a$)\\\small Road 2: RED ($t_a$)};
-  \node[state]         (P2) [below of=P1, node distance=4cm] {\textbf{Phase 2}\\\small Road 1: RED ($t_g$)\\\small Road 2: GREEN ($t_g$)};
-  \node[state]         (P3) [below of=P0, node distance=4cm] {\textbf{Phase 3}\\\small Road 1: RED ($t_a$)\\\small Road 2: AMBER ($t_a$)};
+  
+\node[initial,state] (P0) {\textbf{Phase 0}\\\small Road 1: GREEN ($t_g$)\\\small Road 2: RED ($t_g$)};
+  
+\node[state]         (P1) [right of=P0, node distance=5.5cm] {\textbf{Phase 1}\\\small Road 1: AMBER ($t_a$)\\\small Road 2: RED ($t_a$)};
+  
+\node[state]         (P2) [below of=P1, node distance=4cm] {\textbf{Phase 2}\\\small Road 1: RED ($t_g$)\\\small Road 2: GREEN ($t_g$)};
+  
+\node[state]         (P3) [below of=P0, node distance=4cm] {\textbf{Phase 3}\\\small Road 1: RED ($t_a$)\\\small Road 2: AMBER ($t_a$)};
 
   \path (P0) edge [above] node {Timer ($t_g$) expired} (P1)
         (P1) edge [right] node {Timer ($t_a$) expired} (P2)
@@ -162,6 +177,7 @@ To ensure that drivers on both roads see exact, coherent remaining time before t
     \item \textbf{Phase 3 (Road 1 Red, Road 2 Amber):}
     \[r_1 = \text{remaining}, \quad r_2 = \text{remaining}\]
 \end{itemize}
+
 
 \newpage
 \section{Exercise 2: Proteus Schematic Design}
@@ -204,6 +220,7 @@ The Proteus schematic integrates the STM32F103C6 microcontroller with input peri
 \subsection{Why 4 Displays Share One Set of Segment Lines}
 Directly driving four 7-segment displays individually would require $4 \times 7 = 28$ separate microcontroller output pins. By tying all segment cathodes together in parallel to a single 7-bit bus (\texttt{PB8}--\texttt{PB14}) and activating digits sequentially using 4 enable lines (\texttt{PA6}--\texttt{PA9}), the required pin count drops from 28 to just $7 + 4 = 11$ pins---a $60.7\%$ reduction in GPIO overhead.
 
+
 \newpage
 \section{Exercise 3: STM32CubeMX Project \& Hardware Setup}
 
@@ -239,7 +256,7 @@ HAL_GPIO_WritePin(GPIOB, SEG_MASK, GPIO_PIN_SET);
 Because PNP transistors require a LOW signal to turn on and common-anode LEDs require LOW segment signals to conduct, holding both HIGH ensures that all displays remain completely dark before the main firmware loop starts.
 
 \subsection{Pin Mapping Abstraction (\texttt{pin\_map.h})}
-To decouple hardware port assignments from functional logic, all pin names are mapped through \texttt{pin\_map.h}:
+To isolate hardware port mapping from application logic, all pin aliases are declared in \texttt{pin\_map.h}:
 \begin{code}{c}
 #ifndef INC_PIN_MAP_H_
 #define INC_PIN_MAP_H_
@@ -279,6 +296,7 @@ To decouple hardware port assignments from functional logic, all pin names are m
 
 #endif
 \end{code}
+
 
 \newpage
 \section{Exercise 4: Timer Independence Architecture}
@@ -345,6 +363,7 @@ Consider the $2\,\text{Hz}$ LED blinking requirement ($T_{toggle} = 250\,\text{m
     \item At $\text{TIMER\_CYCLE} = 100\,\text{ms}$: $\text{ticks} = (250 + 50) / 100 = 3$ ticks. $3 \times 100\,\text{ms} \approx 300\,\text{ms}$.
 \end{itemize}
 Thus, changing the underlying hardware timer prescaler or ARR requires only changing \texttt{TIMER\_CYCLE} in \texttt{software\_timer.h}. The rest of the application remains completely untouched.
+
 
 \newpage
 \section{Exercise 5: Button Debouncing and Mode Switching}
@@ -413,7 +432,7 @@ unsigned char is_button_pressed_1s(unsigned char index) {
 }
 \end{code}
 
-\subsection{Input Event Processing with Auto-Repeat (\texttt{input\_processing.c})}
+\subsection{Input Event Processing and Auto-Repeat}
 The function \texttt{button\_event(index, repeat)} evaluates the button FSM and returns \texttt{1} once when the button is first clicked, and repeatedly every $500\,\text{ms}$ while held past $1\,\text{s}$ (if \texttt{repeat == 1}):
 \begin{code}{c}
 #include "input_processing.h"
@@ -460,6 +479,7 @@ uint8_t button_event(uint8_t index, uint8_t repeat)
   return event;
 }
 \end{code}
+
 
 \newpage
 \section{Exercise 6: Display Scanning and Mode Indication}
@@ -533,64 +553,97 @@ void toggle_color(Color_t c)
 }
 \end{code}
 
-\newpage
-\section{Exercises 7, 8 and 9: Parameter Calibration for Red, Amber and Green}
 
-\subsection{Unified Calibration Architecture}
-Rather than duplicating code across three separate handlers, the firmware implements a unified parameter modification engine in \texttt{fsm\_traffic.c}. In any configuration mode ($m \in \{\text{MODE\_RED}, \text{MODE\_AMBER}, \text{MODE\_GREEN}\}$):
+\newpage
+\section{Exercise 7: Red Duration Calibration (Mode 2)}
+
+\subsection{Operational Objective and Specification}
+Per the laboratory specification, Mode 2 enables the user to calibrate the Red LED duration in real time. Upon pressing Button 1 to enter Mode 2:
 \begin{itemize}
-    \item When entering the mode, \texttt{temp\_value} is seeded with the current committed duration.
-    \item Pressing Button 2 increments \texttt{temp\_value} by 1. Holding Button 2 auto-repeats every $500\,\text{ms}$. If \texttt{temp\_value} reaches 99, it cycles back to 1.
-    \item Pressing Button 3 executes \texttt{apply\_value(mode, temp\_value)}. If valid, the new value is committed. If invalid, the edit is rejected and reverted to the saved value.
-    \item If Button 1 is pressed to change modes without pressing Button 3, the uncommitted \texttt{temp\_value} is cleanly discarded, preserving system integrity.
+    \item All Red LEDs on both roads blink synchronously at $2\,\text{Hz}$ ($250\,\text{ms}$ on / $250\,\text{ms}$ off).
+    \item 7-segment display digits 2 and 3 display the mode number \texttt{02}.
+    \item 7-segment display digits 0 and 1 display the Red duration value currently being modified.
+    \item \textbf{Button 2 (Increase):} Increments the value in the range $1 \to 99\,\text{s}$. Single presses increment by 1; holding longer than $1\,\text{s}$ triggers $500\,\text{ms}$ auto-repeat.
+    \item \textbf{Button 3 (Set):} Validates the edited duration against the timing invariant and commits the new setting.
 \end{itemize}
 
-\subsection{Exercise 7: Modify Red Duration (Mode 2)}
-When in Mode 2, the user calibrates $t_{\text{red}}$. To preserve $t_{\text{red}} = t_{\text{amber}} + t_{\text{green}}$ with $t_{\text{green}} \ge 1$:
+\subsection{Mathematical Invariant and Validation Logic}
+The intersection timing invariant $t_{\text{red}} = t_{\text{amber}} + t_{\text{green}}$ requires that any newly proposed red duration $v$ satisfies:
 \begin{equation}
-    v_{\text{red}} > t_{\text{amber}} \implies t_{\text{green}} = v_{\text{red}} - t_{\text{amber}}
+    v > t_{\text{amber}} \implies t_{\text{green}} = v - t_{\text{amber}} \ge 1\,\text{s}
 \end{equation}
+If $v \le t_{\text{amber}}$, the green duration would become zero or negative, creating an impossible and hazardous traffic schedule. In that case, \texttt{apply\_value()} rejects the modification, returns $0$, and the system reverts the display to the previously saved duration.
 
-\subsection{Exercise 8: Modify Amber Duration (Mode 3)}
-When in Mode 3, the user calibrates $t_{\text{amber}}$. To maintain $t_{\text{green}} = t_{\text{red}} - t_{\text{amber}} \ge 1$:
-\begin{equation}
-    v_{\text{amber}} < t_{\text{red}} \implies t_{\text{green}} = t_{\text{red}} - v_{\text{amber}}
-\end{equation}
-
-\subsection{Exercise 9: Modify Green Duration (Mode 4)}
-When in Mode 4, the user calibrates $t_{\text{green}}$. To keep $t_{\text{red}} \le 99$:
-\begin{equation}
-    t_{\text{amber}} + v_{\text{green}} \le 99 \implies t_{\text{red}} = t_{\text{amber}} + v_{\text{green}}
-\end{equation}
-
-\subsection{Implementation of \texttt{apply\_value()}}
 \begin{code}{c}
-static uint8_t apply_value(Mode_t m, uint8_t v)
-{
-  switch (m) {
-    case MODE_RED:                              // Exercise 7
-      if (v <= amber_time) return 0;            // Reject: green would be <= 0
-      red_time   = v;
-      green_time = v - amber_time;
-      return 1;
-
-    case MODE_AMBER:                            // Exercise 8
-      if (v >= red_time) return 0;              // Reject: green would be <= 0
-      amber_time = v;
-      green_time = red_time - amber_time;
-      return 1;
-
-    case MODE_GREEN:                            // Exercise 9
-      if (amber_time + v > MAX_TIME) return 0;  // Reject: red would exceed 99
-      green_time = v;
-      red_time   = amber_time + v;
-      return 1;
-
-    default:
-      return 0;
-  }
-}
+case MODE_RED:                                // Exercise 7: Calibrate Red
+  if (v <= amber_time) return 0;              // Reject: green would be <= 0
+  red_time   = v;
+  green_time = v - amber_time;                // Automatically recalculate green
+  return 1;
 \end{code}
+
+
+\newpage
+\section{Exercise 8: Amber Duration Calibration (Mode 3)}
+
+\subsection{Operational Objective and Specification}
+Mode 3 enables real-time calibration of the Amber warning duration:
+\begin{itemize}
+    \item All Amber LEDs on both roads blink synchronously at $2\,\text{Hz}$.
+    \item 7-segment digits 2 and 3 display mode number \texttt{03}.
+    \item 7-segment digits 0 and 1 display the temporary amber duration under calibration.
+    \item Button 2 increments the value within $1 \to 99\,\text{s}$, with auto-repeat on hold.
+    \item Button 3 commits the validated amber duration.
+\end{itemize}
+
+\subsection{Mathematical Invariant and Validation Logic}
+To preserve total cycle balance while keeping green duration positive:
+\begin{equation}
+    v < t_{\text{red}} \implies t_{\text{green}} = t_{\text{red}} - v \ge 1\,\text{s}
+\end{equation}
+If the user attempts to set amber time equal to or greater than red time ($v \ge t_{\text{red}}$), the condition is physically invalid because the clearance interval cannot exceed the complete stop interval. The firmware rejects the edit:
+
+\begin{code}{c}
+case MODE_AMBER:                              // Exercise 8: Calibrate Amber
+  if (v >= red_time) return 0;                // Reject: green would be <= 0
+  amber_time = v;
+  green_time = red_time - amber_time;         // Recalculate green duration
+  return 1;
+\end{code}
+
+
+\newpage
+\section{Exercise 9: Green Duration Calibration (Mode 4)}
+
+\subsection{Operational Objective and Specification}
+Mode 4 allows the user to directly adjust the Green clearance duration:
+\begin{itemize}
+    \item All Green LEDs on both roads blink synchronously at $2\,\text{Hz}$.
+    \item 7-segment digits 2 and 3 display mode identifier \texttt{04}.
+    \item 7-segment digits 0 and 1 display the green duration value being adjusted.
+    \item Button 2 increments the value ($1 \to 99\,\text{s}$, auto-repeat enabled).
+    \item Button 3 commits the new green duration and updates dependent parameters.
+\end{itemize}
+
+\subsection{Mathematical Invariant and Validation Logic}
+When green duration $v$ is modified, red duration must expand according to:
+\begin{equation}
+    t_{\text{red}} = t_{\text{amber}} + v
+\end{equation}
+Since the 7-segment display buffer accommodates two decimal digits ($00 \to 99$), the system enforces the ceiling condition:
+\begin{equation}
+    t_{\text{amber}} + v \le 99
+\end{equation}
+If the resulting red time would exceed $99\,\text{s}$, the request is rejected:
+
+\begin{code}{c}
+case MODE_GREEN:                              // Exercise 9: Calibrate Green
+  if (amber_time + v > MAX_TIME) return 0;    // Reject: red would exceed 99
+  green_time = v;
+  red_time   = amber_time + v;                // Recalculate dependent red time
+  return 1;
+\end{code}
+
 
 \newpage
 \section{Exercise 10: Complete Integration and Test Verification}
@@ -622,7 +675,7 @@ int main(void)
 \end{code}
 
 \subsection{Timer Callback Execution}
-Hardware Timer 2 triggers every $10\,\text{ms}$, executing \texttt{HAL\_TIM\_PeriodElapsedCallback()} in \texttt{timer.c}:
+Hardware Timer 2 triggers every $10\,\text{ms}$, invoking the callback in \texttt{timer.c}:
 \begin{code}{c}
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
@@ -679,19 +732,20 @@ void fsm_run(void)
 \begin{table}[H]
 \centering
 \caption{Comprehensive Test Results Matrix for Lab 3 Traffic Light System}
-\begin{tabular}{|l|l|p{6.8cm}|c|}
+\small
+\begin{tabular}{|>{\centering\arraybackslash}p{0.7cm}|>{\raggedright\arraybackslash}p{3.0cm}|>{\raggedright\arraybackslash}p{8.4cm}|>{\centering\arraybackslash}p{1.4cm}|}
 \hline
-\textbf{Test Item} & \textbf{Trigger / Input} & \textbf{Expected Observable Behavior} & \textbf{Status} \\ \hline
-1. Normal Cycle & Power on & Road 1 starts Green ($3\,\text{s}$), Road 2 starts Red ($5\,\text{s}$). Dual countdowns decrement synchronously. & PASS \\ \hline
-2. Amber Transition & Countdown reaches $0$ & Road 1 switches to Amber ($2\,\text{s}$), Road 2 continues Red ($2\,\text{s}$). & PASS \\ \hline
-3. Road Swap & Countdown reaches $0$ & Road 1 switches to Red ($5\,\text{s}$), Road 2 switches to Green ($3\,\text{s}$). & PASS \\ \hline
-4. Mode Cycling & Press Button 1 & Cycles cleanly: Mode 1 $\to$ Mode 2 $\to$ Mode 3 $\to$ Mode 4 $\to$ Mode 1. & PASS \\ \hline
-5. Mode 2 Blinking & In Mode 2 & Red LEDs on both roads blink at $2\,\text{Hz}$ ($250\,\text{ms}$). Digits show `02' on right, Red duration on left. & PASS \\ \hline
-6. Value Increment & Press Button 2 & Value increments by 1. Holding $> 1\,\text{s}$ triggers continuous rapid incrementing ($2\,\text{Hz}$). & PASS \\ \hline
-7. Value Wrap-around & Inc past 99 & Value wraps cleanly from 99 to 1. & PASS \\ \hline
-8. Set Validation & Press Button 3 & Invariant $t_{\text{red}} = t_{\text{amber}} + t_{\text{green}}$ enforced. Invalid combinations rejected. & PASS \\ \hline
-9. Discard on Exit & Change mode without Set & Uncommitted changes are discarded; previous valid durations remain intact. & PASS \\ \hline
-10. Return to Normal & Cycle to Mode 1 & System restarts Phase 0 with new validated durations without phase glitches. & PASS \\ \hline
+\textbf{No.} & \textbf{Trigger / Input} & \textbf{Expected Observable Behavior} & \textbf{Status} \\ \hline
+1 & System power-on & Road 1 starts Green ($3\,\text{s}$), Road 2 starts Red ($5\,\text{s}$). Dual countdowns decrement synchronously. & PASS \\ \hline
+2 & Countdown reaches 0 & Road 1 switches to Amber ($2\,\text{s}$), Road 2 remains Red ($2\,\text{s}$). & PASS \\ \hline
+3 & Countdown reaches 0 & Road 1 switches to Red ($5\,\text{s}$), Road 2 switches to Green ($3\,\text{s}$). & PASS \\ \hline
+4 & Press Button 1 & State cycles: Mode 1 $\to$ Mode 2 $\to$ Mode 3 $\to$ Mode 4 $\to$ Mode 1. & PASS \\ \hline
+5 & Enter Mode 2 & Red LEDs on both roads blink at $2\,\text{Hz}$ ($250\,\text{ms}$). Digits show `02' on right, Red duration on left. & PASS \\ \hline
+6 & Press Button 2 & Value increments by 1. Holding $> 1\,\text{s}$ auto-repeats rapidly ($2\,\text{Hz}$). & PASS \\ \hline
+7 & Increment past 99 & Value wraps cleanly from 99 to 1. & PASS \\ \hline
+8 & Press Button 3 & Invariant $t_{\text{red}} = t_{\text{amber}} + t_{\text{green}}$ enforced. Invalid edits rejected. & PASS \\ \hline
+9 & Mode switch w/o Set & Uncommitted changes discarded; previous valid durations remain intact. & PASS \\ \hline
+10 & Return to Mode 1 & System restarts Phase 0 with new validated durations smoothly. & PASS \\ \hline
 \end{tabular}
 \end{table}
 
