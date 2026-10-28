@@ -60,6 +60,27 @@ microprocessor/
 │       ├── lap2_ex9_main.c             # 8x8 LED matrix display ('A')
 │       └── lap2_ex10_main.c            # Horizontal scrolling text animation
 │
+├── Lab3/                               # Lab 3: Buttons, Switches & FSM Traffic Light
+│   ├── VXL_VDK_Lab_3_Buttons-Switches (1).pdf # Lab manual
+│   ├── Traffic_Light_Project_Overview.docx    # Architecture overview
+│   ├── main.tex                        # LaTeX report source (30 pages)
+│   ├── main.pdf                        # Compiled report PDF
+│   ├── 2453300_Lab3.pdf                # Submission copy of Lab 3 Report PDF
+│   ├── codespace.sty                   # Syntax highlighting style
+│   ├── hcmut-report.cls                # HCMUT standard report class
+│   ├── graphics/                       # Cover logo (hcmut.png)
+│   ├── images/                         # Proteus simulation schematics
+│   │   └── lap3.png                    # Complete 4-way traffic light circuit
+│   └── src/                            # Lab 3 C firmware & drivers
+│       ├── main.c                      # Super-loop scheduler & initialization
+│       ├── pin_map.h                   # Port and pin abstraction
+│       ├── software_timer.c/.h         # Hardware-independent timer subsystem
+│       ├── input_reading.c/.h          # Double-buffer button debounce engine
+│       ├── input_processing.c/.h       # 3-state button event & auto-repeat FSM
+│       ├── output_display.c/.h         # 4-digit 7-segment multiplex scanning
+│       ├── fsm_traffic.c/.h            # Traffic lights & parameter tuning FSM
+│       └── timer.c                     # TIM2 ISR callback router
+│
 ├── codespace.sty                       # Root style reference
 ├── hcmut-report.cls                    # Root class reference
 ├── graphics/
@@ -84,11 +105,23 @@ microprocessor/
 - **Cooperative Software Timers:** Array-based non-blocking timers eliminating blocking `HAL_Delay()` and keeping the ISR ultra-lean ($O(1)$).
 - **Matrix Animation:** Circular column shifting buffer producing smooth horizontal scrolling text.
 
+### Lab 3: Buttons, Switches & FSM Traffic Light System
+- **Layered Software Architecture:** Completely modularized architecture separating hardware access (`pin_map.h`), input debounce (`input_reading.c`), button FSM with auto-repeat (`input_processing.c`), timebase (`software_timer.c`), display multiplexing (`output_display.c`), and operational logic (`fsm_traffic.c`).
+- **Input Debounce & Auto-Repeat:** 2-buffer consecutive-match debouncing sampled every $10\,\text{ms}$. Press-and-hold detected after $1\,\text{s}$, transitioning to continuous auto-repeating every $500\,\text{ms}$.
+- **Multi-Rate Software Timer Subsystem:** Accepts durations directly in milliseconds, parameterized by `TIMER_CYCLE` ($10\,\text{ms}$ hardware tick). Decoupled from hardware prescalers.
+- **Display Scanning & Ghosting Prevention:** 4-digit 7-segment multiplexing with 2N2907 PNP driver transistors ($5\,\text{ms}$ per digit, $50\,\text{Hz}$ frame rate). GPIOs initialized HIGH to prevent power-on display ghosting.
+- **4 Operational Modes:**
+  - **Mode 1 (Normal):** Dual synchronized road countdowns obeying 4-phase sequence.
+  - **Mode 2 (Tuning Red):** Road LEDs blink Red at $2\,\text{Hz}$ ($250\,\text{ms}$ toggle). Displays show mode index `02` and calibrated duration.
+  - **Mode 3 (Tuning Amber):** Road LEDs blink Amber at $2\,\text{Hz}$. Displays show mode `03` and calibrated duration.
+  - **Mode 4 (Tuning Green):** Road LEDs blink Green at $2\,\text{Hz}$. Displays show mode `04` and calibrated duration.
+- **Timing Invariant Enforcement:** Mathematical validation $t_{\text{red}} = t_{\text{green}} + t_{\text{amber}}$ guarantees that traffic phases remain safe and conflict-free upon saving. Uncommitted edits are discarded on mode transition.
+
 ---
 
 ## Build Instructions (LaTeX)
 
-Each subfolder (`Lab1` and `Lab2`) is fully self-contained. To compile:
+Each subfolder (`Lab1`, `Lab2`, and `Lab3`) is fully self-contained. To compile:
 
 ```powershell
 # For Lab 1
@@ -97,5 +130,9 @@ pdflatex -shell-escape -interaction=nonstopmode main.tex
 
 # For Lab 2
 cd Lab2
+pdflatex -shell-escape -interaction=nonstopmode main.tex
+
+# For Lab 3
+cd Lab3
 pdflatex -shell-escape -interaction=nonstopmode main.tex
 ```
