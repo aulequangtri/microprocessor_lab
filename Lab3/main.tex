@@ -33,7 +33,7 @@ In embedded systems, interfacing digital inputs such as mechanical push-buttons 
 \end{itemize}
 
 \subsection{System Overview}
-The system models a four-way crossroad controlled by three user push-buttons and displays status across 12 LEDs and four 7-segment displays:
+The system models a four-way crossroad controlled by three user push-buttons and displays status across 12 LEDs and four 7-segment displays. All firmware source code, circuit schematics, and report files are hosted in our public GitHub repository at \url{https://github.com/aulequangtri/microprocessor_lab}:
 \begin{itemize}
     \item \textbf{Traffic LEDs (12 LEDs total):} The 4-way crossroad contains 4 Red, 4 Amber, and 4 Green LEDs. Road 1 (North--South) and Road 2 (East--West) each govern two opposing traffic heads ($2 \times 3 = 6$ LEDs per road):
     \begin{itemize}
@@ -757,5 +757,15 @@ Laboratory 3 successfully implemented a production-grade four-way traffic light 
     \item \textbf{Timer-Independent Design:} Software timers scaled in milliseconds ensuring timing determinism across arbitrary hardware tick rates.
     \item \textbf{Safe Configuration UX:} Parameter calibration with real-time validation, automatic dependency recalculation, and uncommitted edit discarding.
 \end{itemize}
+
+\section{Source Code and Repository}
+All STM32CubeIDE project files, firmware source code, Proteus simulation circuits, and \LaTeX{} documentation are version-controlled and publicly available at:
+\begin{center}
+    \textbf{Repository: } \url{https://github.com/aulequangtri/microprocessor_lab}
+\end{center}
+The dedicated Lab 3 codebase, schematics, and report assets are located in the \texttt{Lab3/} subfolder:
+\begin{center}
+    \url{https://github.com/aulequangtri/microprocessor_lab/tree/main/Lab3}
+\end{center}
 
 \end{document}
